@@ -1,0 +1,350 @@
+---
+title: "assignment_1_final"
+author: "Phuong Tang"
+date: "09/08/2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1. Question 1:
+
+Describe one advantage and one disadvantage of flexible (verses a less flexible) approaches for regression.
+Under what conditions might a less flexible approach be preferred?
+
+* The advantage of flexible approach versus less flexible approaches: Flexible method help us to have less bias and this method is quite good if the number of sample is large.
+
+* The disadvantage of flexible approach versus less flexible approaches: Flexible method fit the training data hard and hence the model can change a lot when difference training data are used.
+
+* The conditions which a less flexible approach be preferred:
+
+    + When the number of sample is small.
+    
+    + When the problem is simple.
+    
+    + When we are interested in inference and the interpretability of the results.
+    
+    + When the data is noisy.
+    
+### 2. Question 2:
+
+#### (a) Plot $\pi$~0~ f~0~(x) and  $\pi$~1~ f~1~(x) in the same figure
+```{r}
+x = seq(-4,5,length=100)
+
+plot(x,
+	0.69*dnorm(x,0,1),
+	pch=21,
+	col="blue",
+	cex=0.6,
+	lwd = 4,
+	type="l",
+	xlab = "x",
+	ylab = "pi_k*f_k",
+	main = "Conditional densities multiplied by prior probabilities")
+
+points(x,
+	0.31*dnorm(x,1,0.7071068),
+	pch=21,
+	col="red",
+	cex=0.6,
+	lwd = 4,
+	type="l")
+
+legend("topright",
+	legend = c("Class 0", "Class 1"),
+	col = c("blue","red"),
+	lwd = 4,
+	text.col = "black",
+	horiz = FALSE)
+
+```
+
+
+#### (b) Find the bayes decision boundary:
+
+$\pi$~0~ f~0~(x) = $\pi$~1~ f~1~(x)
+
+$0.69*(1/(\sqrt{2\pi})*exp(-1/2*x^2)) = 0.31* (1/\sqrt\pi)*exp(-(x-1)^2))$
+
+=> $1/2*x^2-2*x+1-ln(0.31/0.69*\sqrt{2}) = 0$
+
+The value of X at Bayes decision boundary as below :
+
+```{r}
+quadratic <- function(a,b,c){
+  disc = b^2 - 4*a*c
+  if(disc < 0){
+    print("There is no roots")
+  }
+  else if (disc == 0){
+    print(-c/b)
+  }
+  
+  else{
+    print(-b+sqrt(disc)/(2*a))
+    print(-b-sqrt(disc)/(2*a))
+  }
+}
+
+quadratic(1/2,-2,1-log(0.31/0.69*sqrt(2)))
+
+```
+```{r}
+x = seq(-6,6,length=100)
+
+plot(x,
+	0.69*dnorm(x,0,1),
+	pch=21,
+	col="blue",
+	cex=0.6,
+	lwd = 4,
+	type="l",
+	xlab = "x",
+	ylab = "pi_k*f_k",
+	main = "Conditional densities multiplied by prior probabilities")
+
+points(x,
+	0.31*dnorm(x,1,0.7071068),
+	pch=21,
+	col="red",
+	cex=0.6,
+	lwd = 4,
+	type="l")
+
+legend("topleft",
+	legend = c("Class 0", "Class 1"),
+	col = c("blue","red"),
+	lwd = 3,
+	text.col = "black",
+	horiz = FALSE)
+
+points(c(0.9545773197717013,0.9545773197717013),
+	c(-0.1,0.3),
+	lwd = 8,
+	col = "black",
+	type="l")
+
+points(c(3.045423,3.045423),
+	c(-0.1,0.3),
+	lwd = 8,
+	col = "black",
+	type="l")
+```
+
+#### (c) Using Bayes classifier, classify the observation X=3
+
+Based on the Bayes classifier theorem, the Bayes decision boundary will help us to predict which class the observation X will belong to.
+
+If X < 0.9545, it is more likely to belong to class 0. 
+
+If X falls in range (0.9545 , 3.0454), it is more likely to belong to class 1. 
+
+If X >3.0454, it is more likely to belong to class 0.
+
+For X=3, it is predicted to belong to class 1.
+
+We will justify our prediction by calculating the probability of each class.
+
+Probability of X=3 at class 0 and class 1 as below:
+
+$\pi$~0~ f~0~(x) = 0.003057975
+
+$\pi$~1~ f~1~(x) = 0.003203383
+
+This means that if X=3, it will be belong to class 1 as probability of class 1 is higher.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+print(0.69*1/sqrt(2*pi)*exp(-1/2*3^2))
+print(0.31*1/sqrt(pi)*exp(-2^2))
+```
+#### (d) Find the probability that an observation with X=2 is in class 1 
+The probability that an observation with X=2 is in class 1 as below:
+$\pi$~1~ f~1~(X=2) = 0.06434166
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+print(0.31*1/sqrt(pi)*exp(-(1^2)))
+```
+
+
+### 3. Question 3:
+#### (a) Perform KNN regression with k=2,5,10,20,30,50,100 and compute training and testing MSE for each k
+
+```{r}
+setwd("P:/")
+getwd() 
+
+Auto_test=read.csv("AutoTest.csv",header=T,na.strings="?")
+fix(Auto_test)
+
+Auto_train=read.csv("AutoTrain.csv",header=T,na.strings="?")
+fix(Auto_train)
+
+kNN <- function(k,x.train,y.train,x.pred) {
+# 
+## This is kNN regression function for problems with
+## 1 predictor
+#
+## INPUTS
+#
+# k       = number of observations in nieghbourhood 
+# x.train = vector of training predictor values
+# y.train = vector of training response values
+# x.pred  = vector of predictor inputs with unknown
+#           response values 
+#
+## OUTPUT
+#
+# y.pred  = predicted response values for x.pred
+
+## Initialize:
+n.pred <- length(x.pred);		y.pred <- numeric(n.pred)
+
+## Main Loop
+for (i in 1:n.pred){
+  d <- abs(x.train - x.pred[i])
+  dstar = d[order(d)[k]]
+  y.pred[i] <- mean(y.train[d <= dstar])		
+}
+## Return the vector of predictions
+invisible(y.pred)
+}
+
+```
+
+```{r}
+## compute test MSE
+
+MSE <- function(y, y.pred){
+  mse = mean((y - y.pred) ^2)
+  return(mse)
+  }
+```
+If k=2,5,10,20,30,50,100: the training MSE as below:
+
+```{r}
+# compute training MSE
+
+k = c(2,5,10,20,30,50,100);
+train.error = numeric(7);
+
+for (i in 1:7) {
+  pred = kNN(k[i],Auto_train$weight,Auto_train$mpg,Auto_train$weight)
+  train.error[i] = MSE(Auto_train$mpg,pred)
+  print(train.error[i])
+}
+
+
+```
+
+If k=2,5,10,20,30,50,100: the testing MSE as below:
+```{r}
+# compute testing MSE
+
+test.error = numeric(7);
+for (i in 1:7) {
+  pred = kNN(k[i],Auto_train$weight,Auto_train$mpg,Auto_test$weight)
+  test.error[i] = MSE(Auto_test$mpg,pred)
+  print(test.error[i])
+}
+```
+
+```{r}
+
+#plot KNN error rate
+
+plot(1/k,
+	train.error,
+	pch=21,
+	col="blue",
+	cex=0.6,
+	lwd = 3,
+	type="b",
+	xlab = "1/k",
+	ylab = "Error rate",
+	main = "The KNN error rate")
+
+points(1/k,
+	test.error,
+	pch=21,
+	col="red",
+	cex=0.6,
+	lwd = 3,
+	type="b")
+
+legend("topright",
+	legend = c("Training errors", "Testing errors"),
+	col = c("blue","red"),
+	lwd = 4,
+	text.col = "black",
+	horiz = FALSE)
+```
+
+#### (b) Which value of k perform best ?
+
+```{r}
+kNN.error = min(test.error)
+kNN.error
+```
+The best k as below:
+```{r}
+Best.k = k[which.min(test.error)]
+Best.k
+```
+Based on aboved trained MSE and tested MSE, k=30 performed best because it gives the lowest testing MSE
+
+
+#### (c) Plot the best KNN model and comment the results
+Our best kNN model with k=30 as below:
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+plot(Auto_train$weight,
+	Auto_train$mpg,
+	pch=21,
+	col="blue",
+	cex=0.6,
+	lwd = 3,
+	type="p",
+	xlab = "weight",
+	ylab = "miles per gallon",
+	main = "KNN model plot for K=30")
+
+points(Auto_test$weight,
+	Auto_test$mpg,
+	pch=21,
+	col="green",
+	cex=0.6,
+	lwd = 3,
+	type="p")
+
+points(Auto_test$weight,
+	kNN(30,Auto_train$weight,Auto_train$mpg,Auto_test$weight),
+	pch=21,
+	col="red",
+	cex=0.6,
+	lwd = 5,
+	type="p")
+
+legend("topright",
+	legend = c("Trained sets", "Test sets", "KNN model"),
+	col = c("blue","green", "red"),
+	lwd = 4,
+	text.col = "black",
+	horiz = FALSE)
+
+```
+
+COmments: KNN model with the best k=30 will be the central line of all the data. 
+
+#### (d) Comment on the bias-variance trade-off when defining a neighbourhood for kNN regression
+
+If we choose k=1 which is the most flexible kNN method, the training error rate decreases (8.95) but the testing error rate is quite high (29.27).That is high flexibility, low bias but high variance
+
+If we choose k too large (for example k=100), we get large training and testing error rate (training MSE = 19.01 and testing MSE = 22.01). That is low flexibility, high bias and low variance
+
+We need to choose the k value which is trade-off Bias-Variance and help us to have minimum of the prediction error rate. In this case, we choose 1/k that lie near the minimum of the characteristic U shaped testing error curve
+

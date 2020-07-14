@@ -1,0 +1,341 @@
+---
+title: "Assignment_2_DataMining"
+author: "Phuong Tang"
+date: "12 September 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+
+#### (a) Perform multiple logistic regression using training data
+
+
+```{r}
+library(ggplot2)
+
+
+Bank_train=read.csv("BankTrain.csv",header=T,na.strings="?")
+fix(Bank_train)
+
+glm.fits=glm(Bank_train$y~Bank_train$x1+Bank_train$x2 ,data=Bank_train ,family =binomial)
+summary (glm.fits)
+
+```
+#### Comment: 
+The p-value here is very small associated with x1 and x2 and it depicts that x1 and x2 have real association with y. Standard error is also very small for both predictors.
+
+The negative coeeficients for x1 and x2 suggest that predictors x1 and x2 are less likely to make the probability of forged banknote increase.
+
+We have a value of 1322.01 on 959 degrees of freedom. Including the independent variables (x1 and x2) decreased the deviance to 498.98 points on 957 degrees of freedom, a significant reduction in deviance.
+The Residual Deviance has reduced by 823.03 with a loss of two degrees of freedom.
+
+#### (b) 
+##### i. Plot the training data and the decision boundary for the threshole 0.5 on the same figure
+
+```{r}
+coef(glm.fits)
+
+# log(p(x)/(1-p(x))) = ??0 + ??1X1 + ??2X2 . Decison boudary with threshole 0.5 means p(x) = 0.5. Log 1 = 0
+
+intercept2 = coef(glm.fits)[1]/-coef(glm.fits)[3]
+slope2 = coef(glm.fits)[2]/-coef(glm.fits)[3]
+
+glm.data <- ifelse(Bank_train$y >0.5, "Forged", "Genuine")
+ggplot(glm.fits)+geom_point(aes(x=Bank_train$x1,
+                               y=Bank_train$x2,color=glm.data,shape=glm.data),size=2) +
+  ggtitle("The decision boundary") +
+  xlab("x1") +
+  ylab("x2") + labs(colour = "Bank Notes") + labs(shape = "Bank Notes") + geom_abline(intercept =intercept2 ,slope =slope2,color="darkblue",size=2 )
+
+```
+##### ii.Compute the confusion matrix for the testing set using threshold 0.5 and comment the output with y = 0 denotes a genuine banknote and y = 1 denotes a forged banknote
+
+```{r}
+
+glm.fit=glm(y~x1+x2,data=Bank_train,family=binomial)
+Bank_test=read.csv("BankTest.csv",header=T,na.strings="?")
+ 
+glm.probs <- predict(glm.fit,Bank_test, type="response")
+
+glm.pred = rep(0,412)
+glm.pred[glm.probs > .5] = 1
+table(glm.pred, Bank_test$y)
+
+mean(glm.pred==Bank_test$y)
+```
+Accuracy: (216+149)/412 = 0.8859
+Training error: (20+27)/412 = 0.114
+Sensitivity: 149/(149+27) = 0.8466
+Specificity: 216/(216+20) = 0.9153
+Precision = 149/(20+149) = 0.8817
+
+###### Comment: 
+It's a good result: training error rate is significant low (0.114) and Sensitivity,Specificity and Precision are close to 1. The overall accuracy of model is quite high 88.59% (2dp).
+
+##### iii.Compute the confusion matrix for the testing set using threshold 0.4 and 0.6 and comment the output. 
+
+GLM confusion matrix with threshole 0.4
+```{r}
+# when the threshole is 0.4
+glm.probs <- predict(glm.fit,Bank_test, type="response")
+glm.pred = rep(0,412)
+glm.pred[glm.probs > .4] = 1
+
+table(glm.pred, Bank_test$y)
+mean(glm.pred==Bank_test$y)
+```
+Accuracy: (207+155)/412 = 0.8786
+Training error: (29+21)/412 = 0.121
+Sensitivity: 155/(155+21) = 0.8806
+Specificity: 207/(207+29) = 0.8771
+Precision = 155/(155+29) = 0.8424
+
+There is no big difference between the output using 0.4 threshole and the output using threshole 0.5. Overall, the threshole 0.5 performed slightly better because the overall accuracy with using threshole 0.5 is 88.59% as compared to 87.86% when using threshole 0.4
+```{r}
+# when the threshole s 0.6
+glm.probs <- predict(glm.fit,Bank_test, type="response")
+glm.pred = rep(0,412)
+glm.pred[glm.probs > .6] = 1
+
+table(glm.pred, Bank_test$y)
+mean(glm.pred==Bank_test$y)
+```
+Accuracy: (220+141)/412 = 0.8762
+Training error: (35+16)/412 = 0.1238
+Sensitivity: 141/(141+35) = 0.8011
+Specificity: 220/(220+16) = 0.9322
+Precision = 141/(141+16) = 0.8981
+
+In comparison the total accuracy of 3 models with thresholes 0.5, 0.4 and 0.6, the model with thresholes 0.5 give the best value (88.59% > 87.86% > 87.62%).
+
+However, there are some scenarios which the bank can choose another threshole based on their requirement. 
+For example, if the bank focus on the accuracy of identification of forged banknotes, they can look at sensitivity parameter to choose the threshole. In this case, they will choose the threshole 0.4 as the sensitivity is the highest. 
+
+###### Describe a situation when the threshold 0.4 model may be the preferred model
+
+The bank can prefer the model with threshold 0.4 because this model will provide more accurate identification of banknotes which are indeed forged, even they will pay more cost to fix the overall error rate.(the threshold 0.4 model gives sensitivity 88.06% as compared to 84.66% using threshole 0.5 and 80.11% using threshole 0.6)
+
+## Question 2
+#### (a) Fit an LDA model to predict the probability of a banknote being forged using the predictors x1 and x2. 
+
+```{r}
+library(MASS)
+
+
+##  LDA model using Train data set
+lda.fit = lda(y ~ x1 + x2, data = Bank_train)
+lda.fit
+
+##  Making Predictions
+lda.pred = predict(lda.fit, Bank_test)
+names(lda.pred)
+
+##  Confusing Matrix
+lda.class = lda.pred$class
+table(lda.class, Bank_test$y)
+
+##  Calculate accuracy:
+mean(lda.class == Bank_test$y)
+
+```
+#### Compute the confusion matrix for the testing set
+Accuracy: (216+146)/412 = 0.8786
+Training error: (20+30)/412 = 0.121
+Sensitivity: 146/(146+30) = 0.8295
+Specificity: 216/(216+20) = 0.9153
+Precision = 146/(146+20) = 0.8795
+
+#### (b) Fit an QDA model to predict the probability of a banknote being forged using the predictors x1 and x2. Compute the confusion matrix for the testing set.
+```{r}
+
+##  QDA model using Train data set
+qda.fit = qda(y ~ x1 + x2, data = Bank_train)
+qda.fit
+
+Bank_test=read.csv("BankTest.csv",header=T,na.strings="?")
+ 
+##  Making Predictions
+qda.class = predict(qda.fit, Bank_test)$class
+```
+
+Table QDA confusion matrix
+```{r}
+##  Confusing Matrix
+table(qda.class, Bank_test$y)
+
+##  Calculate accuracy:
+mean(qda.class == Bank_test$y)
+
+```
+#### Compute the confusion matrix for the testing set
+Accuracy: (219+148)/412 = 0.8907
+Training error: (17+28)/412 = 0.1092
+Sensitivity: 148/(148+28) = 0.841
+Specificity: 219/(219+17) = 0.928
+Precision = 148/(148+17) = 0.897
+
+#### (c) Comment on your results from parts (a) and (b). Compare these methods with the logistic regression model (using threshole 0.5) from question 1. Which method would you recommend for this problem and why?
+
+The output shows that LDA and QDA performed. QDA method would be the recommended model for this problem because this model performed better in accuracy, training error, specificity, sensitivity and precision.
+
+However, if we consider the situation that the Bank accept to pay for more accurate identification of banknotes which indeed forged,then the logistic regession model with threshole 0.4 is the recommended model in this sistuation as it give the highest sensitivity 0.8466 as compared to GLM with other threshole and LDA and QDA.
+
+The logistic regression is simpler and less sensitive to outliers than QDA. In addition, due to the large sample size, the performance of logistric regression is nearly the same to QDA. 
+
+## Question 3: Calculate testing error rate for QDA
+
+Step 1: Find decision boundary
+
+$\pi$~0~ f~0~(x) = $\pi$~1~ f~1~(x)
+
+$0.5*(1/2(\sqrt{2\pi})*exp(-1/8*x^2)) = 0.5* (1/\sqrt{4\pi})*exp(-1/4*(x-1)^2))$
+
+=> $x^2-4*x+2-8ln(sqrt(2)) = 0$
+=> x= 4.184626 or x=-0.1846255
+
+```{r}
+x = seq(-10,10,length=1000)
+
+plot(x,
+  0.5*dnorm(x,1,sqrt(2)),
+	pch=10,
+	col="blue",
+	cex=0.6,
+	lwd = 2,
+	type="l",
+	xlab = "x",
+	ylab = "pi_k*f_k",
+	main = "Conditional densities multiplied by prior probabilities")
+
+points(x,
+	0.5*dnorm(x,0,sqrt(4)),
+	pch=10,
+	col="red",
+	cex=0.6,
+	lwd = 2,
+	type="l")
+
+legend("topright",
+	legend = c("Class 1", "Class 0"),
+	col = c("blue","red"),
+	lwd = 4,
+	text.col = "black",
+	horiz = FALSE)
+
+
+points(c(4.184626,4.184626),
+	c(-0.1,0.3),
+	lwd = 4,
+	col = "black",
+	type="l")
+
+points(c(-0.1846255,-0.1846255),
+	c(-0.1,0.3),
+	lwd = 4,
+	col = "black",
+	type="l")
+
+
+```
+Step 2: calculate testing error rate
+The testing error rate are defined as below formulation:
+$\pi$~1~ P(X < -0.18|Y in class 1) + $\pi$~0~ P(-0.1846255 < X < 4.18|Y in class 0)+ $\pi$~1~ P(X > 4.18|Y in class 1)
+
+Testing error rate for QDA:
+a = pnorm(-0.1846255,1,sqrt(2),lower.tail=TRUE)
+b = pnorm(4.184626, 0,sqrt(4), lower.tail=TRUE) - pnorm(-0.1846255, 0,sqrt(4), lower.tail=TRUE)
+c = pnorm(4.184626,1,sqrt(2),lower.tail=FALSE)
+Total_error_rate_QDA = 0.5*a +0.5*b + 0.5*c
+```{r}
+
+# This is the testing error rate for x<-0.1846255 which should be classified to class 0 but has been classified incorrectly to class 1
+
+a = pnorm(-0.1846255,1,sqrt(2),lower.tail=TRUE)
+
+# This is the testing error rate for x<-0.1846255 which should be classified to class 0 but has been classified incorrectly to class 1
+b = pnorm(4.184626, 0,sqrt(4), lower.tail=TRUE) - pnorm(-0.1846255, 0,sqrt(4), lower.tail=TRUE)
+
+
+# This is the testing error rate for x<4.184626 which should be classified to class 0 but has been classified incorrectly to class 1
+c = pnorm(4.184626,1,sqrt(2),lower.tail=FALSE)
+
+# the probability of classifying incorrectly by QDA:
+Total_error_rate = 0.5*a +0.5*b + 0.5*c
+Total_error_rate
+
+```
+### Calculate the testing error rate for LDA.
+
+Step 1: Find decision boundary
+
+$\pi$~0~ f~0~(x) = $\pi$~1~ f~1~(x)
+
+$0.5*(1/(\sqrt{2\pi}std)*exp(-1/2var*(x-0)^2)) = 0.5*(1/(\sqrt{2\pi}std)*exp(-1/2var*(x-1)^2))$
+
+=> $ 2*x - 1 = 0$
+=> x= 1/2
+```{r}
+
+x = seq(-10,10,length=1000)
+
+plot(x,
+  0.5*dnorm(x,1,sqrt(2)),
+	pch=10,
+	col="blue",
+	cex=0.6,
+	lwd = 2,
+	type="l",
+	xlab = "x",
+	ylab = "pi_k*f_k",
+	main = "Conditional densities multiplied by prior probabilities")
+
+points(x,
+	0.5*dnorm(x,0,sqrt(4)),
+	pch=10,
+	col="red",
+	cex=0.6,
+	lwd = 2,
+	type="l")
+
+legend("topright",
+	legend = c("Class 1", "Class 0"),
+	col = c("blue","red"),
+	lwd = 4,
+	text.col = "black",
+	horiz = FALSE)
+
+
+points(c(0.5,0.5),
+	c(-0.1,0.3),
+	lwd = 4,
+	col = "black",
+	type="l")
+
+
+
+```
+Testing error rate for LDA:
+a = pnorm(0.5,1,sqrt(2),lower.tail=TRUE)
+b = pnorm(0.5, 0,sqrt(4), lower.tail=FALSE)
+Total_error_rate_LDA = 0.5*a +0.5*b
+
+```{r}
+
+# This is the testing error rate for x<0.5 which should be classified to class 0 but has been classified incorrectly to class 1
+
+a = pnorm(0.5,1,sqrt(2),lower.tail=TRUE)
+
+# This is the testing error rate for x<0.5 which should be classified to class 0 but has been classified incorrectly to class 1
+b = pnorm(0.5, 0,sqrt(4), lower.tail=FALSE)
+
+
+# the probability of classifying incorrectly by QDA:
+Total_error_rate = 0.5*a +0.5*b
+Total_error_rate
+```
+#### Comment on your results for LDA and QDA:
+the LDA define wrong the decision boundary as it's only the perfect model if each class have common variance, why in this case, class 0 and class 1 have different variance. Look at the test error rate, the LDA have higher test error rate than QDA.

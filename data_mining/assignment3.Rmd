@@ -1,0 +1,293 @@
+---
+title: "assignment3"
+author: "Phuong Tang"
+date: "09/10/2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+#### (a) Fit a regression tree to the training set (do not prune the tree). Plot the tree
+```{r}
+library(tree)
+library(MASS)
+Carseat_train=read.csv("CarseatsTrain.csv",header=T,na.strings="?")
+fix(Carseat_train)
+
+Carseat_test=read.csv("CarseatsTest.csv",header=T,na.strings="?")
+fix(Carseat_test)
+
+# Grow the regression tree
+tree.carseat=tree(Sales~ .,data = Carseat_train)
+summary(tree.carseat)
+plot(tree.carseat)
+text(tree.carseat,pretty=0)
+
+```
+
+##### Interpret the result: The original tree look bushy with a lot of predictors included.
+##### What are the test and training MSEs for your tree?
+```{r}
+# Estimate the training MSE of the tree
+yhat=predict(tree.carseat,newdata=Carseat_train)
+mean((yhat-Carseat_train$Sales)^2)
+
+# Estimate the testing MSE of the tree
+yhat=predict(tree.carseat,newdata=Carseat_test)
+mean((yhat-Carseat_test$Sales)^2)
+```
+#### (b)Use the cv.tree() R function to prune your tree (use your judgement here).
+Answer: After applying cv.tree(), I chose the 
+```{r}
+# Use cross validation to choose tree complexity
+cv.carseat=cv.tree(tree.carseat)
+plot(cv.carseat$size,cv.carseat$dev,type='b')
+tree.min <- which.min(cv.carseat$dev)
+points(cv.carseat$size[tree.min], cv.carseat$dev[tree.min], col="red", cex=2, pch=20)
+cv.carseat
+```
+```{r}
+# Prune the tree
+prune.carseat=prune.tree(tree.carseat,best=10)
+plot(prune.carseat)
+text(prune.carseat,pretty=0)
+```
+```{r}
+# Estimate the training MSE of the pruned tree
+yhat=predict(prune.carseat,newdata=Carseat_train)
+mean((yhat-Carseat_train$Sales)^2)
+
+# Estimate the testing MSE of the pruned tree
+yhat=predict(prune.carseat,newdata=Carseat_test)
+mean((yhat-Carseat_test$Sales)^2)
+```
+#### Does the pruned tree perform better? 
+Answer: After calculating testing MSE and training MSE for prunned tree and make comparision with original tree, we can see that the training MSE of the pruned tree increases a little bit (from 3.04 to 4.54) while the testing MSE is nearly the same (from 6.03 to 6.35). This means that the pruned tree have similar performance with original tree. However, the pruned tree performs better because the pruned tree reduces the complexity of the final classifier, and hence improves predictive accuracy by the reduction of overfitting.
+
+#### (c) Fit a bagged regression tree and a random forest to the training set. What are the test and training MSEs for each model? Was decorrelating trees an effective strategy for this problem?
+```{r}
+# Generate bagged trees
+library (randomForest)
+set.seed(1)
+bag.carseat=randomForest(Sales~.,data=Carseat_train,mtry=9,importance=TRUE)
+bag.carseat
+
+yhat.bag = predict(bag.carseat,newdata=Carseat_train)
+mean((yhat.bag-Carseat_train$Sales)^2)
+
+yhat.bag = predict(bag.carseat,newdata=Carseat_test)
+mean((yhat.bag-Carseat_test$Sales)^2)
+```
+What are the test and training MSEs for each model?
+Answer: 
+For bagged trees:
++  The training MSEs for bagged trees is 0.86 (2dp)
++  The testing MSEs for bagged trees is 4.34 (2dp)
+```{r}
+set.seed (1)
+rf.carseat =randomForest(Sales~.,data=Carseat_train ,mtry=4, importance =TRUE)
+
+yhat.rf = predict(rf.carseat,newdata=Carseat_train)
+mean((yhat.rf-Carseat_train$Sales)^2)
+
+yhat.rf = predict(rf.carseat,newdata=Carseat_test)
+mean((yhat.rf-Carseat_test$Sales)^2)
+```
+For random forest:
+By default, randomForest() uses p/3 variables when building a random forest of regression trees. here we use mtry =4
++  The training MSEs for random forest is 0.97 (2dp)
++  The testing MSEs for random forest is 4.30 (2dp)
+
+Was decorrelating trees an effective strategy for this problem?
+Answer: Decorrelating trees was an effective strategy for this problem compared with test MSEs of full grown tree (6.03), pruning (6.35) and bagging(4.34), test MSE of random forest (4.30) is the lowest.
+```{r}
+importance(rf.carseat)
+varImpPlot(rf.carseat)
+```
+#### (d) Fit a boosted regression tree to the training set. Experiment with different tree depths, shrinkage parameters and the number of trees. What are the test and training MSEs for your best tree? Comment on your results.
+```{r}
+library(gbm)
+set.seed(1)
+boost.carseat1=gbm(Sales~.,data=Carseat_train,distribution="gaussian",n.trees=5000,interaction.depth=4)
+summary(boost.carseat1)
+
+yhat.boost=predict(boost.carseat1,newdata=Carseat_test,n.trees=5000)
+mean((yhat.boost-Carseat_test$Sales)^2)
+```
+```{r}
+# add shrinkage 0.01, reduce number of split
+set.seed(1)
+boost.carseat2=gbm(Sales~.,data=Carseat_train,distribution="gaussian",n.trees=5000,interaction.depth=4, shrinkage=0.01)
+yhat.boost=predict(boost.carseat2,newdata=Carseat_test,n.trees=5000)
+mean((yhat.boost-Carseat_test$Sales)^2)
+```
+```{r}
+# reduce shrinkage 0.001 (reserve tree depths as 4 to keep the complexity of each tree, reserve number of trees as high as 5000 - can happen overfit if number of tree is too large)
+boost.carseat3=gbm(Sales~.,data=Carseat_train,distribution="gaussian",n.trees=5000,interaction.depth=4, shrinkage=0.001)
+yhat.boost=predict(boost.carseat3,newdata=Carseat_test,n.trees=5000)
+mean((yhat.boost-Carseat_test$Sales)^2)
+```
+```{r}
+# the model 3 with shrikage 0.001 is quite good. Now, try to reduce tree depths
+boost.carseat4=gbm(Sales~.,data=Carseat_train,distribution="gaussian",n.trees=5000,interaction.depth=1, shrinkage=0.001)
+yhat.boost=predict(boost.carseat4,newdata=Carseat_test,n.trees=5000)
+mean((yhat.boost-Carseat_test$Sales)^2)
+```
+```{r}
+# increase number of tree
+boost.carseat5=gbm(Sales~.,data=Carseat_train,distribution="gaussian",n.trees=6000,interaction.depth=4, shrinkage=0.001)
+yhat.boost=predict(boost.carseat5,newdata=Carseat_test,n.trees=6000)
+mean((yhat.boost-Carseat_test$Sales)^2)
+```
+After experimenting 5 different trees, the lowest test MSEs is 3.7504 (4dp), therefore the tree (boost.carseat3) with tree depth of 4, shrinkage parameter of 0.001 and numbers of trees of 5000 is the best tree. Its training MSE is 2.6814 (4dp)
+```{r}
+yhat.boost.train=predict(boost.carseat3,newdata=Carseat_train,n.trees=5000)
+mean((yhat.boost.train-Carseat_train$Sales)^2)
+```
+#### (d) Which model performed best and which predictors were the most important in this model?
+Test MSE of the best boosted regression tree (3.7504) is the lowest as compared to MSE of random forest (4.3), full grown tree (6.03), pruning (6.35) and bagging(4.34), therefore boosted regression tree is the best model.
+We find the important predictors in the model.Looking at the table, we can see that Price and CompPrice were the most important in this model.
+```{r}
+summary(boost.carseat3)
+```
+## Question 2
+(a) Label each node in the itemset lattice with the following letter(s):
+(b) Find the confidence and lift for the rule      Comment on what you find.
+
+## Question 3
+#### (a) Perform k-means clustering using k = 3. Plot the clustering using a different colour for each cluster.
+```{r}
+data = read.csv("A3data2.csv")
+set.seed(2)
+km.out=kmeans(data[,1:2],3,nstart=20)
+plot(data[,1:2], col=(km.out$cluster+1), main="K-Means Clustering Results with K=3")
+
+```
+
+#### (b) Using hierarchical clustering with complete linkage and Euclidean distance, cluster the data, provide a dendrogram and plot the clustering with 3 clusters. Repeat using single linkage.
+```{r}
+# Using hierarchical clustering with complete linkage, plot the clustering with 3 clusters 
+hc.complete =hclust (dist(data[,1:2]), method ="complete")
+cut.tree = cutree(hc.complete, 3)
+plot(data[,1:2],col = cut.tree, main="Hierarchical clustering with complete linkage and K=3")
+```
+```{r}
+# provide a dendrogram
+plot(hc.complete, main =" Complete Linkage ", xlab ="", sub ="",cex =.9)
+```
+
+#### Repeat using single likage
+```{r}
+# Using hierarchical clustering with single linkage, plot the clustering with 3 clusters
+hc.single =hclust (dist(data[,1:2]), method ="single")
+cut.tree = cutree(hc.single, 3)
+plot(data[,1:2],col = cut.tree, main="Hierarchical clustering with single linkage and K=3")
+```
+```{r}
+plot(hc.single, main =" Single Linkage ", xlab ="", sub ="",cex =.9)
+```
+#### (c) Comment on your results from parts (a) and (b). Provide possible explanations for each clustering obtained.
+Looking at results, we can see that the K-means clustering and Hierarchical clustering with complete linkage with K=3 are better than the hierarchical clustering with single linkage. 
+
+
+#### (d) Rescale your data using the R function scale(Data, center=TRUE, scale=TRUE) and repeat parts (a) and (b).
+```{r}
+xsc=scale (data, center=TRUE, scale=TRUE)
+
+```
+```{r}
+km.out.scale=kmeans(xsc,3,nstart=20)
+plot(xsc, col=(km.out.scale$cluster+1), main="K-Means Clustering Results with rescale data and with K=3")
+
+# Using hierarchical clustering with complete linkage, plot the clustering with 3 clusters 
+hc.complete.scale =hclust (dist(xsc), method ="complete")
+cut.tree = cutree(hc.complete.scale, 3)
+plot(xsc,col = cut.tree, main="Hierarchical clustering with complete linkage and rescale data")
+
+# provide a dendrogram
+plot(hc.complete.scale, main =" Complete Linkage with rescale data ", xlab ="", sub ="",cex =.9)
+
+# Using hierarchical clustering with single linkage, plot the clustering with 3 clusters
+hc.single.scale =hclust (dist(xsc), method ="single")
+cut.tree = cutree(hc.single.scale, 3)
+plot(xsc,col = cut.tree, main="Hierarchical clustering with single linkage and rescale data")
+
+# provide a dendrogram
+plot(hc.single.scale, main =" Single Linkage with rescale data ", xlab ="", sub ="",cex =.9)
+```
+```{r}
+
+
+```
+
+#### Does rescaling improve your results? Comment on your results and provide possible explanations for each clustering obtained.
+Scale the variables to have mean zero or the standard deviation one can help to improve the performance of the model, especially for the model hierarchical clustering with single linkage. In this case, rescaling data before applying the model is better than not rescaling data.
+
+## Question 4: In this question, you will fit support vector machines to the Banknote data from Assignment 2 (on the Learn page). Only use the predictors x1 and x3 to fit your classifiers.
+
+#### (a) Is it possible to find a separating hyperplane for the training data? Explain.
+```{r}
+library(e1071)
+Bank.train=read.csv("BankTrain.csv",header=T,na.strings="?")
+fix(Bank.train)
+
+Bank.test=read.csv("BankTest.csv",header=T,na.strings="?")
+fix(Bank.test)
+
+Bank.train$y=as.factor(Bank.train$y)
+plot(Bank.train$x1, Bank.train$x3, col=Bank.train$y, xlab="x1", ylab="x3")
+legend("topright",legend = c("Forged", "Genuine"),col = c("red","black"), pch=21)
+```
+Comment: The two classes are not linearly separable. So it is not possible to find a separating hyperplane for the training data.
+
+#### (b) Fit a support vector classiffier to the training data using tune() to find the best cost value. Plot the best classiffier and produce a confusion matrix for the testing data. Comment on your results.
+
+```{r}
+set.seed (1)
+dat=data.frame(x1=Bank.train$x1,x3=Bank.train$x3,y=as.factor(Bank.train$y))
+tune.out=tune(svm,y~x1+x3,data=Bank.train,kernel ="linear",ranges =list(cost=c(0.001,0.01, 0.1,1,5,10,100)))
+summary(tune.out)
+```
+We can see that cost = 0.1 results in the lowest cross-validation error rate.
+```{r}
+bestmod =tune.out$best.model
+summary(bestmod)
+```
+Plot the best classifier
+```{r}
+plot(bestmod,dat)
+```
+Produce a confusion matrix for the testing data
+```{r}
+testdat=data.frame(x1=Bank.test$x1,x3=Bank.test$x3,y=as.factor(Bank.test$y))
+ypred=predict(bestmod ,testdat)
+table(predict =ypred,truth= testdat$y)
+accuracy.rate = (197 + 165)/(197+11+39+165)
+accuracy.rate
+```
+Comment: With cost=0.01, 197+165=362 of 412 test observations are correctly classified. 39+11=50 observations are misclassified. The accuracy rate is 87.9%. 
+
+#### (c) Fit a support vector machine (SVM) to the training data using the radial kernel.Use tune() to find the best cost and gamma values. Plot the best SVM and produce a confusion matrix for the testing data. Compare your results with those obtained in part (b)
+
+```{r}
+tune.out=tune(svm, y~x1+x3, data=Bank.train, kernel="radial", ranges=list(cost=c(0.01,0.1,1.5,10,100),gamma=c(0.5,1,2,3,4)))
+summary(tune.out)
+```
+```{r}
+bestmodel = tune.out$best.model
+summary(bestmodel)
+```
+```{r}
+plot(bestmodel,dat)
+```
+```{r}
+ypred = predict(bestmodel, testdat)
+table(predict =ypred,truth= testdat$y)
+accuracy.rate = (212 + 165)/(212+11+24+165)
+accuracy.rate
+```
+Comment: The accuracy rate is 91.5% which is much higher from accuracy rate in part b (87.9%).
+Because the training data is not linearly separable, support vector machine is applied to this non-linear data. SVM with radial kernel is capable of capturing the decision boundary for this data.
